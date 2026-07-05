@@ -1,0 +1,153 @@
+<div class="head">
+  <div>
+    <a routerLink="/tables" class="muted">← Tables</a>
+    <h1 class="mono">{{ tableName }}</h1>
+  </div>
+  <div class="actions">
+    <button class="primary" data-testid="add-item" (click)="addItem()">+ Add item</button>
+    <button (click)="exportJson()">Export JSON</button>
+    <button (click)="exportCsv()">Export CSV</button>
+    <label class="import-btn">
+      Import JSON
+      <input type="file" accept="application/json,.json" (change)="onImportFile($event)" hidden />
+    </label>
+  </div>
+</div>
+
+@if (desc(); as d) {
+  <div class="meta card">
+    <div class="meta-grid">
+      <div><span class="muted">Status</span><br /><span class="badge">{{ d.TableStatus }}</span></div>
+      <div><span class="muted">Items</span><br />{{ d.ItemCount }}</div>
+      <div><span class="muted">Size</span><br />{{ d.TableSizeBytes }} bytes</div>
+      <div>
+        <span class="muted">Keys</span><br />
+        @for (k of d.KeySchema; track k.AttributeName) {
+          <span class="badge mono">{{ k.AttributeName }} · {{ k.KeyType }}</span>
+        }
+      </div>
+      <div>
+        <span class="muted">Billing</span><br />
+        <span class="badge">{{ d.BillingModeSummary?.BillingMode || 'PROVISIONED' }}</span>
+      </div>
+      @if (indexes().length) {
+        <div>
+          <span class="muted">Indexes</span><br />
+          @for (i of indexes(); track i) { <span class="badge mono">{{ i }}</span> }
+        </div>
+      }
+    </div>
+  </div>
+}
+
+<div class="query-panel card">
+  <div class="tabs">
+    <button [class.active]="mode() === 'scan'" (click)="mode.set('scan')">Scan</button>
+    <button [class.active]="mode() === 'query'" (click)="mode.set('query')">Query</button>
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label>Index (optional)</label>
+      <select [(ngModel)]="indexName">
+        <option value="">(table)</option>
+        @for (i of indexes(); track i) { <option [value]="i">{{ i }}</option> }
+      </select>
+    </div>
+    <div class="field">
+      <label>Limit</label>
+      <input type="number" [(ngModel)]="limit" />
+    </div>
+    @if (mode() === 'query') {
+      <div class="field">
+        <label>Sort order</label>
+        <select [(ngModel)]="scanForward">
+          <option [ngValue]="true">Ascending</option>
+          <option [ngValue]="false">Descending</option>
+        </select>
+      </div>
+    }
+  </div>
+
+  @if (mode() === 'query') {
+    <div class="field">
+      <label>Key Condition Expression</label>
+      <input class="mono" [(ngModel)]="keyConditionExpression" placeholder="pk = :pk AND begins_with(sk, :prefix)" />
+    </div>
+  }
+
+  <div class="field">
+    <label>Filter Expression (optional)</label>
+    <input class="mono" [(ngModel)]="filterExpression" placeholder="attribute_exists(#s) AND price > :min" />
+  </div>
+
+  @if (mode() === 'scan') {
+    <div class="field">
+      <label>Projection Expression (optional)</label>
+      <input class="mono" [(ngModel)]="projectionExpression" placeholder="pk, sk, price" />
+    </div>
+  }
+
+  <div class="row">
+    <div class="field">
+      <label>Expression Attribute Values (JSON)</label>
+      <textarea class="mono" rows="3" [(ngModel)]="expressionValuesText" placeholder='{ ":pk": "USER#1", ":min": 10 }'></textarea>
+    </div>
+    <div class="field">
+      <label>Expression Attribute Names (JSON)</label>
+      <textarea class="mono" rows="3" [(ngModel)]="expressionNamesText" placeholder='{ "#s": "status" }'></textarea>
+    </div>
+  </div>
+
+  <div class="btns">
+    <button class="primary" data-testid="run-query" (click)="run(true)" [disabled]="loading()">
+      @if (loading()) { <span class="spinner"></span> }
+      {{ mode() === 'query' ? 'Run Query' : 'Run Scan' }}
+    </button>
+  </div>
+</div>
+
+@if (error()) {
+  <div class="error">{{ error() }}</div>
+}
+
+<div class="result-bar">
+  <span class="muted">Returned {{ count() }} · scanned {{ scannedCount() }}</span>
+  <button (click)="nextPage()" [disabled]="!hasNext() || loading()">Next page →</button>
+</div>
+
+<div class="card table-wrap" style="padding:0">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:120px">Actions</th>
+        @for (c of columns(); track c) { <th class="mono">{{ c }}</th> }
+      </tr>
+    </thead>
+    <tbody>
+      @for (it of items(); track $index) {
+        <tr data-testid="item-row">
+          <td>
+            <button (click)="editItem(it)">Edit</button>
+            <button class="danger" (click)="deleteItem(it)">✕</button>
+          </td>
+          @for (c of columns(); track c) {
+            <td class="mono" [title]="cell(it, c)">{{ cell(it, c) }}</td>
+          }
+        </tr>
+      }
+      @if (!loading() && items().length === 0) {
+        <tr><td [attr.colspan]="columns().length + 1" class="muted">No items.</td></tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (editorOpen()) {
+  <dl-item-editor
+    [title]="editorTitle()"
+    [item]="editorItem()"
+    (save)="onEditorSave($event)"
+    (cancel)="editorOpen.set(false)"
+  />
+}

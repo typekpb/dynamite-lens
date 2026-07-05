@@ -1,0 +1,22 @@
+services:
+  # DynamoDB Local — in-memory for a zero-friction, self-contained stack.
+  # (In-memory avoids the sqlite file-permission / lock issues that occur when a
+  #  named volume is mounted for the non-root `dynamodblocal` user, and keeps the
+  #  footprint minimal. Data resets on restart — fine for local dev & e2e.)
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: dynamite-ddb-local
+    command: ["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"]
+    ports:
+      - "8000:8000"
+
+  # Dynamite Lens web UI (nginx-served Angular SPA + CORS proxy).
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dynamite-web
+    depends_on:
+      - dynamodb-local
+    ports:
+      - "8080:80"
